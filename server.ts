@@ -20,6 +20,7 @@ import reviewRouter from "./routes/reviewRoutes.js";
 import couponRouter from "./routes/couponRoutes.js";
 import categoryRouter from "./routes/categoryRoutes.js";
 import notificationRouter from "./routes/notificationRoutes.js";
+import settingsRouter from "./routes/settingsRoutes.js";
 import { serve } from "inngest/express";
 import { inngest, functions } from "./inngest/index.js";
 import deliveryPartnerRouter from "./routes/deliveryPartnerRoutes.js";
@@ -94,6 +95,7 @@ app.use("/api/reviews", reviewRouter);
 app.use("/api/coupons", couponRouter);
 app.use("/api/categories", categoryRouter);
 app.use("/api/notifications", notificationRouter);
+app.use("/api/settings", settingsRouter);
 app.use("/api/inngest", serve({ client: inngest, functions }));
 
 // Error handling
@@ -102,6 +104,10 @@ app.use((error: any, req: Request, res: Response, next: NextFunction) => {
     res.status(500).json({ message: error.message });
 });
 
-httpServer.listen(port, () => {
-    console.log(`Server is running at http://localhost:${port}`);
-});
+if (process.env.NODE_ENV !== "production") {
+    httpServer.listen(port, () => {
+        console.log(`Server is running at http://localhost:${port}`);
+    });
+}
+
+export default app;

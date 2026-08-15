@@ -7,52 +7,52 @@ const categoriesData = [
     {
         name: "Fruits & Vegetables",
         slug: "fruits-vegetables",
-        image: "/src/assets/fruits_vegetables.png",
+        image: "/categories/fruits_vegetables.png",
     },
     {
         name: "Personal Care",
         slug: "personal-care",
-        image: "/src/assets/personal_care.png",
+        image: "/categories/personal_care.png",
     },
     {
         name: "Pantry Staples",
         slug: "pantry-staples",
-        image: "/src/assets/pantry_staples.png",
+        image: "/categories/pantry_staples.png",
     },
     {
         name: "Bakery",
         slug: "bakery",
-        image: "/src/assets/bakery.png",
+        image: "/categories/bakery.png",
     },
     {
         name: "Beverages",
         slug: "beverages",
-        image: "/src/assets/drinks.png",
+        image: "/categories/drinks.png",
     },
     {
         name: "Meat & Seafood",
         slug: "meat-seafood",
-        image: "/src/assets/meat_seafood.png",
+        image: "/categories/meat_seafood.png",
     },
     {
         name: "Snacks",
         slug: "snacks",
-        image: "/src/assets/snacks.png",
+        image: "/categories/snacks.png",
     },
     {
         name: "Frozen Foods",
         slug: "frozen-foods",
-        image: "/src/assets/frozen_foods.png",
+        image: "/categories/frozen_foods.png",
     },
     {
         name: "Baby Care",
         slug: "baby-care",
-        image: "/src/assets/baby_care.png",
+        image: "/categories/baby_care.png",
     },
     {
         name: "Dairy & Eggs",
         slug: "dairy-eggs",
-        image: "/src/assets/dairy_eggs.png",
+        image: "/categories/dairy_eggs.png",
     }
 ];
 

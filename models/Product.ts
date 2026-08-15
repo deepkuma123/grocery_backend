@@ -15,6 +15,9 @@ const productSchema = new mongoose.Schema(
         isDeleted: { type: Boolean, default: false },
         rating: { type: Number, default: 0 },
         reviewCount: { type: Number, default: 0 },
+        retailerName: { type: String, default: "" },
+        gallery: [{ type: String }],
+        alertLimit: { type: Number, default: 5 },
         
         hasVariants: { type: Boolean, default: false },
         variants: [
@@ -25,6 +28,7 @@ const productSchema = new mongoose.Schema(
                 costPrice: { type: Number, default: 0 },
                 originalPrice: { type: Number, default: 0 },
                 stock: { type: Number, default: 0 },
+                image: { type: String, default: "" },
             }
         ]
     },

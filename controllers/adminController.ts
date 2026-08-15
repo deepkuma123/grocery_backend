@@ -7,7 +7,7 @@ import bcrypt from "bcrypt";
 
 // get admin dashboard data
 export const getAdminStats = async (req: Request, res: Response) => {
-    const [totalOrders, totalUsers, totalProducts, outOfStock, totalPartners, recentOrders, profitData] = await Promise.all([
+    const [totalOrders, totalUsers, totalProducts, outOfStock, lowStock, totalPartners, recentOrders, profitData] = await Promise.all([
         Order.countDocuments({ $nor: [{ paymentMethod: "card", isPaid: false }] }),
         User.countDocuments(),
         Product.countDocuments(),
@@ -16,6 +16,15 @@ export const getAdminStats = async (req: Request, res: Response) => {
                 { hasVariants: { $ne: true }, stock: 0 },
                 { hasVariants: true, "variants.stock": { $not: { $gt: 0 } } }
             ]
+        }),
+        Product.countDocuments({
+            $expr: {
+                $lte: [
+                    "$stock",
+                    { $ifNull: ["$alertLimit", 5] }
+                ]
+            },
+            isDeleted: { $ne: true }
         }),
         DeliveryPartner.countDocuments(),
         Order.find({ $nor: [{ paymentMethod: "card", isPaid: false }] })
@@ -31,7 +40,7 @@ export const getAdminStats = async (req: Request, res: Response) => {
 
     const totalProfit = profitData.length > 0 ? profitData[0].totalProfit : 0;
 
-    res.json({ totalOrders, totalUsers, totalProducts, outOfStock, totalPartners, recentOrders, totalProfit });
+    res.json({ totalOrders, totalUsers, totalProducts, outOfStock, lowStock, totalPartners, recentOrders, totalProfit });
 };
 
 // get delivery partners list for admin
