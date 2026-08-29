@@ -53,7 +53,13 @@ export const getProducts = async (req: Request, res: Response) => {
         where.isDeleted = { $ne: true };
     }
     if (category && category !== "all") where.category = category as string;
-    if (search) where.name = { $regex: search as string, $options: "i" };
+    if (search) {
+        where.$or = [
+            { name: { $regex: search as string, $options: "i" } },
+            { "variants.sku": { $regex: search as string, $options: "i" } },
+            { "variants.unit": { $regex: search as string, $options: "i" } }
+        ];
+    }
     if (organic === 'true') where.isOrganic = true;
     if (minPrice || maxPrice) {
         where.price = {};
