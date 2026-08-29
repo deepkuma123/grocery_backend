@@ -49,22 +49,40 @@ export const getProducts = async (req: Request, res: Response) => {
 
     const admin = await isAdmin(req);
     const where: any = {};
+    const andConditions: any[] = [];
+
     if (!(admin && includeDeleted === 'true')) {
-        where.isDeleted = { $ne: true };
+        andConditions.push({ isDeleted: { $ne: true } });
     }
-    if (category && category !== "all") where.category = category as string;
+    if (category && category !== "all") {
+        andConditions.push({ category: category as string });
+    }
     if (search) {
-        where.$or = [
-            { name: { $regex: search as string, $options: "i" } },
-            { "variants.sku": { $regex: search as string, $options: "i" } },
-            { "variants.unit": { $regex: search as string, $options: "i" } }
-        ];
+        andConditions.push({
+            $or: [
+                { name: { $regex: search as string, $options: "i" } },
+                { "variants.sku": { $regex: search as string, $options: "i" } },
+                { "variants.unit": { $regex: search as string, $options: "i" } }
+            ]
+        });
     }
-    if (organic === 'true') where.isOrganic = true;
+    if (organic === 'true') {
+        andConditions.push({ isOrganic: true });
+    }
     if (minPrice || maxPrice) {
-        where.price = {};
-        if (minPrice) where.price.$gte = Number(minPrice);
-        if (maxPrice) where.price.$lte = Number(maxPrice);
+        const priceQuery: any = {};
+        if (minPrice) priceQuery.$gte = Number(minPrice);
+        if (maxPrice) priceQuery.$lte = Number(maxPrice);
+        andConditions.push({
+            $or: [
+                { price: priceQuery },
+                { "variants.price": priceQuery }
+            ]
+        });
+    }
+
+    if (andConditions.length > 0) {
+        where.$and = andConditions;
     }
 
     const sortOpt: any = {};
@@ -81,10 +99,61 @@ export const getProducts = async (req: Request, res: Response) => {
     const total = await Product.countDocuments(where);
     const pages = Math.ceil(total / limitNum);
 
-    const products = await Product.find(where).sort(sortOpt).skip(skip).limit(limitNum).lean();
+    const pipeline: any[] = [{ $match: where }];
+
+    if (sort === "price_asc") {
+        pipeline.push({
+            $addFields: {
+                effectivePrice: {
+                    $min: {
+                        $concatArrays: [["$price"], { $ifNull: ["$variants.price", []] }]
+                    }
+                }
+            }
+        });
+        pipeline.push({ $sort: { effectivePrice: 1, _id: 1 } });
+    } else if (sort === "price_desc") {
+        pipeline.push({
+            $addFields: {
+                effectivePrice: {
+                    $max: {
+                        $concatArrays: [["$price"], { $ifNull: ["$variants.price", []] }]
+                    }
+                }
+            }
+        });
+        pipeline.push({ $sort: { effectivePrice: -1, _id: -1 } });
+    } else {
+        pipeline.push({ $sort: { ...sortOpt, _id: -1 } });
+    }
+
+    pipeline.push({ $skip: skip });
+    pipeline.push({ $limit: limitNum });
+
+    const products = await Product.aggregate(pipeline);
 
     const productsWithDiscount = products.map((p: any) => {
         const discount = p.originalPrice && p.price ? Math.round(((p.originalPrice - p.price) / p.originalPrice) * 100) : 0;
+        
+        if (p.variants && p.variants.length > 0) {
+            p.variants = p.variants.filter((v: any) => {
+                let keep = true;
+                if (minPrice && v.price < Number(minPrice)) keep = false;
+                if (maxPrice && v.price > Number(maxPrice)) keep = false;
+                
+                if (search && keep) {
+                    const s = (search as string).toLowerCase();
+                    const matchName = p.name && p.name.toLowerCase().includes(s);
+                    if (!matchName) {
+                        const matchSku = v.sku && v.sku.toLowerCase().includes(s);
+                        const matchUnit = v.unit && v.unit.toLowerCase().includes(s);
+                        if (!matchSku && !matchUnit) keep = false;
+                    }
+                }
+                return keep;
+            });
+        }
+        
         return { ...p, id: p._id, discount };
     });
 
