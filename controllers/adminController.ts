@@ -7,25 +7,15 @@ import bcrypt from "bcrypt";
 
 // get admin dashboard data
 export const getAdminStats = async (req: Request, res: Response) => {
-    const [totalOrders, totalUsers, totalProducts, outOfStock, lowStock, totalPartners, recentOrders, profitData] = await Promise.all([
+    const days = parseInt(req.query.days as string) || 7;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    startDate.setHours(0, 0, 0, 0);
+
+    const [totalOrders, totalUsers, totalProducts, totalPartners, recentOrders, profitData, salesDataRaw, productsData] = await Promise.all([
         Order.countDocuments({ $nor: [{ paymentMethod: "card", isPaid: false }] }),
         User.countDocuments(),
-        Product.countDocuments(),
-        Product.countDocuments({
-            $or: [
-                { hasVariants: { $ne: true }, stock: 0 },
-                { hasVariants: true, "variants.stock": { $not: { $gt: 0 } } }
-            ]
-        }),
-        Product.countDocuments({
-            $expr: {
-                $lte: [
-                    "$stock",
-                    { $ifNull: ["$alertLimit", 5] }
-                ]
-            },
-            isDeleted: { $ne: true }
-        }),
+        Product.countDocuments({ isDeleted: { $ne: true } }),
         DeliveryPartner.countDocuments(),
         Order.find({ $nor: [{ paymentMethod: "card", isPaid: false }] })
             .sort({ createdAt: -1 })
@@ -35,12 +25,64 @@ export const getAdminStats = async (req: Request, res: Response) => {
         Order.aggregate([
             { $match: { status: "Delivered", $nor: [{ paymentMethod: "card", isPaid: false }] } },
             { $group: { _id: null, totalProfit: { $sum: { $subtract: ["$subtotal", { $ifNull: ["$totalCostPrice", 0] }] } } } }
-        ])
+        ]),
+        Order.aggregate([
+            { $match: { createdAt: { $gte: startDate }, $nor: [{ paymentMethod: "card", isPaid: false }] } },
+            {
+                $group: {
+                    _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+                    revenue: { $sum: "$total" },
+                    orders: { $sum: 1 }
+                }
+            },
+            { $sort: { _id: 1 } }
+        ]),
+        Product.find({ isDeleted: { $ne: true } }, 'hasVariants stock variants alertLimit')
     ]);
 
     const totalProfit = profitData.length > 0 ? profitData[0].totalProfit : 0;
 
-    res.json({ totalOrders, totalUsers, totalProducts, outOfStock, lowStock, totalPartners, recentOrders, totalProfit });
+    let outOfStock = 0;
+    let lowStock = 0;
+
+    productsData.forEach((p: any) => {
+        const limit = p.alertLimit || 5;
+        if (!p.hasVariants) {
+            if (p.stock <= 0) outOfStock++;
+            else if (p.stock <= limit) lowStock++;
+        } else {
+            if (p.variants && p.variants.length > 0) {
+                if (p.variants.every((v: any) => v.stock <= 0)) {
+                    outOfStock++;
+                } else if (p.variants.some((v: any) => v.stock > 0 && v.stock <= limit)) {
+                    lowStock++;
+                }
+            } else {
+                outOfStock++;
+            }
+        }
+    });
+
+    // Process sales data to fill in missing days
+    const salesData = [];
+    for (let i = 0; i < days; i++) {
+        const d = new Date();
+        d.setDate(d.getDate() - ((days - 1) - i));
+        // Use local date string instead of ISO to prevent timezone shifts
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        const dateStr = `${year}-${month}-${day}`;
+        
+        const existingData = salesDataRaw.find((s: any) => s._id === dateStr);
+        salesData.push({
+            date: dateStr,
+            revenue: existingData ? existingData.revenue : 0,
+            orders: existingData ? existingData.orders : 0
+        });
+    }
+
+    res.json({ totalOrders, totalUsers, totalProducts, outOfStock, lowStock, totalPartners, recentOrders, totalProfit, salesData });
 };
 
 // get delivery partners list for admin

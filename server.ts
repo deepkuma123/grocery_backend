@@ -76,7 +76,7 @@ app.use("/api/", apiLimiter);
 app.use(express.json());
 app.use(cookieParser());
 
-const port = process.env.PORT || 5000;
+const port = process.env.PORT || 8000;
 connectDB();
 
 app.get("/", (req: Request, res: Response) => {
