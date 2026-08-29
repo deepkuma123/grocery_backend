@@ -3,6 +3,8 @@ import Product from "../models/Product.js";
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 
+import Category from "../models/Category.js";
+
 const isAdmin = async (req: Request) => {
     try {
         const token = req.cookies?.token || req.headers.authorization?.split(" ")[1];
@@ -54,8 +56,24 @@ export const getProducts = async (req: Request, res: Response) => {
     if (!(admin && includeDeleted === 'true')) {
         andConditions.push({ isDeleted: { $ne: true } });
     }
+    
     if (category && category !== "all") {
-        andConditions.push({ category: category as string });
+        const categories = await Category.find().lean();
+        
+        const getCategorySlugs = (slug: string): string[] => {
+            const target = categories.find((c: any) => c.slug === slug);
+            if (!target) return [slug];
+            
+            let slugs = [target.slug];
+            const children = categories.filter((c: any) => c.parentCategory?.toString() === target._id.toString());
+            for (const child of children) {
+                slugs = slugs.concat(getCategorySlugs(child.slug));
+            }
+            return slugs;
+        };
+
+        const categorySlugs = getCategorySlugs(category as string);
+        andConditions.push({ category: { $in: categorySlugs } });
     }
     if (search) {
         andConditions.push({
